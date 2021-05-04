@@ -22,6 +22,13 @@
  */
 
 #include "GraphViewer.h"
+#include "../Processors/Splitter/Splitter.h"
+#include "../Utils/Utils.h"
+
+const int NODE_WIDTH = 150;
+const int NODE_HEIGHT = 100;
+const int BORDER_SIZE = 20;
+
 
 GraphViewer::GraphViewer()
 {
@@ -36,144 +43,86 @@ GraphViewer::~GraphViewer()
 {
 }
 
+void GraphViewer::updateNodes(Array<GenericProcessor*> rootProcessors)
+{
+    removeAllNodes(); // clear the current nodes
+            
+    Array<Splitter*> splitters;
 
-void GraphViewer::addNode (GenericEditor* editor)
+    int rootNum = -1;
+    
+    for (auto processor : rootProcessors)
+    {
+        rootNum++;
+        int level = -1;
+        
+        while ((processor != nullptr) || (splitters.size() > 0))
+        {
+            if (processor != nullptr)
+            {
+                level++;
+                
+                if (!nodeExists(processor))
+                {
+                    addNode(processor->getEditor(), level, rootNum);
+                }
+                
+                if (processor->isSplitter())
+                {
+                    splitters.add((Splitter*) processor);
+                    processor = splitters.getLast()->getDestNode(0); // travel down chain 0 first
+                } else {
+                    processor = processor->getDestNode();
+                }
+            }
+            else {
+                Splitter* splitter = splitters.getFirst();
+                processor = splitter->getDestNode(1); // then come back to chain 1
+                GraphNode* gn = getNodeForEditor(splitter->getEditor());
+                level = gn->getLevel();
+                rootNum = gn->getHorzShift() + 1;
+                splitters.remove(0);
+            }
+        }
+    }
+    
+    //updateNodeLocations();
+}
+
+bool GraphViewer::nodeExists(GenericProcessor* p)
+{
+
+    if (getNodeForEditor(p->getEditor()) != nullptr)
+        return true;
+    
+    return false;
+}
+
+void GraphViewer::addNode (GenericEditor* editor, int level, int offset)
 {
     GraphNode* gn = new GraphNode (editor, this);
     addAndMakeVisible (gn);
     availableNodes.add (gn);
     
-    gn->setBounds (20, 20, 150, 50);
-    updateNodeLocations();
-}
+    int thisNodeWidth = NODE_WIDTH;
 
-
-void GraphViewer::removeNode (GenericEditor* editor)
-{
-    availableNodes.remove (getIndexOfEditor (editor));
+    if (gn->getName().length() > 15)
+    {
+        thisNodeWidth += (gn->getName().length() - 15) * 10;
+    }
     
-    updateNodeLocations();
+    gn->setLevel(level);
+    gn->setHorzShift(offset);
+    gn->setWidth(thisNodeWidth);
+    gn->updateBoundaries();
+    
 }
-
 
 void GraphViewer::removeAllNodes()
 {
     availableNodes.clear();
     
-    updateNodeLocations();
-}
-
-
-// void GenericEditor::updateNodeName(GenericEditor* editor)
-// {
-//     GraphNode* n = getNodeForEditor(editor);
-//     n->repaint();
-// }
-
-
-void GraphViewer::updateNodeLocations()
-{
-    const int numAvailableNodes = availableNodes.size();
-    
-    // If this was made just for future purpose it would be better to execute this only in debug mode
-#if JUCE_DEBUG
-    // set the initial locations
-    for (int i = 0; i < numAvailableNodes; ++i)
-    {
-    }
-#endif
-    
-    rootNum = 0;
-    
-    // do initial layout
-    for (int i = 0; i < numAvailableNodes; ++i)
-    {
-        checkLayout (availableNodes[i]);
-    }
-    
-    // check for overlap
-    for (int i = 0; i < numAvailableNodes; ++i)
-    {
-        for (int j = 0; j < numAvailableNodes; ++j)
-        {
-            if (j != i)
-            {
-                if (availableNodes[j]->getLevel() == availableNodes[i]->getLevel()
-                    && availableNodes[j]->getHorzShift() == availableNodes[i]->getHorzShift())
-                {
-                    availableNodes[j]->setHorzShift (availableNodes[j]->getHorzShift() + 1);
-                }
-            }
-        }
-    }
-    
     repaint();
-}
-
-
-void GraphViewer::checkLayout (GraphNode* gn)
-{
-    if (gn != nullptr)
-    {
-        GraphNode* sourceNode = nullptr;
-        
-        if (gn->isMerger())
-        {
-            Array<GenericEditor*> editors = gn->getConnectedEditors();
-            
-            int level1 = 0;
-            int level2 = 0;
-            
-            if (editors[0] != nullptr)
-            {
-                level1 = getNodeForEditor (editors[0])->getLevel();
-            }
-            
-            if (editors[1] != nullptr)
-            {
-                level2 = getNodeForEditor (editors[1])->getLevel();
-            }
-            
-            // std::cout << "LEVEL1 = " << level1 << " LEVEL2 = " << level2 << std::endl;
-            
-            sourceNode = level1 > level2 ? getNodeForEditor (editors[0])
-            : getNodeForEditor (editors[1]); // choose the higher source
-        }
-        else
-        {
-            sourceNode = getNodeForEditor (gn->getSource());
-        }
-        
-        if (! sourceNode)
-        {
-            gn->setLevel (0);
-            gn->setHorzShift (rootNum);
-            
-            ++rootNum;
-        }
-        else if (sourceNode->isSplitter())
-        {
-            Array<GenericEditor*> editors = sourceNode->getConnectedEditors();
-            
-            const int newHorizontalShift = gn->hasEditor (editors[1])
-            ? sourceNode->getHorzShift() + 1
-            : sourceNode->getHorzShift();
-            
-            // increase level
-            gn->setLevel (sourceNode->getLevel() + 1);
-            // increase horizontal shift
-            gn->setHorzShift (newHorizontalShift);
-        }
-        else
-        {
-            // increase level
-            gn->setLevel (sourceNode->getLevel() + 1);
-            // use the same horizontal shift
-            gn->setHorzShift (sourceNode->getHorzShift());
-        }
-        
-        checkLayout (getNodeForEditor (gn->getDest()));
-    }
 }
 
 
@@ -182,6 +131,7 @@ int GraphViewer::getIndexOfEditor (GenericEditor* editor) const
     int index = -1;
     
     const int numAvailableNodes = availableNodes.size();
+    
     for (int i = 0; i < numAvailableNodes; ++i)
     {
         if (availableNodes[i]->hasEditor (editor))
@@ -205,39 +155,6 @@ GraphNode* GraphViewer::getNodeForEditor (GenericEditor* editor) const
 }
 
 
-int GraphViewer::nodesAtLevel (int level) const
-{
-    int numNodes = 0;
-    
-    for (auto& node : availableNodes)
-    {
-        // Level value is not used.
-        // It seems we should check if current level of each node is equal to the passed as param level
-        // TODO : research this question and either delete this comment or fix the bug
-        if (node->getLevel() == numNodes)
-            ++numNodes;
-    }
-    
-    return numNodes;
-}
-
-
-int GraphViewer::getHorizontalShift (GraphNode* gn) const
-{
-    int shift = 0;
-    
-    for (auto& node : availableNodes)
-    {
-        if (node == gn)
-            break;
-        else
-            if (node->getLevel() == gn->getLevel())
-                ++shift;
-    }
-    
-    return shift;
-}
-
 
 void GraphViewer::paint (Graphics& g)
 {
@@ -246,7 +163,6 @@ void GraphViewer::paint (Graphics& g)
     g.setFont (Font("Paragraph",  50, Font::plain));
     
     g.setColour (Colours::grey);
-    
     
     g.drawFittedText ("open ephys", 40, 40, getWidth()-50, getHeight()-60, Justification::bottomRight, 100);
     
@@ -286,8 +202,8 @@ void GraphViewer::paint (Graphics& g)
 void GraphViewer::connectNodes (int node1, int node2, Graphics& g)
 {
     
-    Point<float> start  = availableNodes[node1]->getCenterPoint();
-    Point<float> end    = availableNodes[node2]->getCenterPoint();
+    juce::Point<float> start  = availableNodes[node1]->getCenterPoint();
+    juce::Point<float> end    = availableNodes[node2]->getCenterPoint();
     
     Path linePath;
     float x1 = start.getX();
@@ -300,8 +216,14 @@ void GraphViewer::connectNodes (int node1, int node2, Graphics& g)
                       x2, y1 + (y2 - y1) * 0.1f,
                       x2, y2);
     
-    PathStrokeType stroke (2.0f);
-    g.strokePath (linePath, stroke);
+    
+    g.setColour (Colour(30,30,30));
+    PathStrokeType stroke3 (3.5f);
+    g.strokePath (linePath, stroke3);
+    
+    g.setColour (Colours::grey);
+    PathStrokeType stroke2 (2.0f);
+    g.strokePath (linePath, stroke2);
 }
 
 /// ------------------------------------------------------
@@ -311,6 +233,9 @@ GraphNode::GraphNode (GenericEditor* ed, GraphViewer* g)
 , gv            (g)
 , isMouseOver   (false)
 {
+    nodeId = ed->getProcessor()->getNodeId();
+    horzShift = 0;
+    vertShift = 0;
 }
 
 
@@ -321,41 +246,33 @@ GraphNode::~GraphNode()
 
 int GraphNode::getLevel() const
 {
-    // int level = -1;
-    
-    // GenericEditor* ed = editor;
-    
-    // while (ed != nullptr)
-    // {
-    //     level += 1;
-    //     ed = ed->getSourceEditor();
-    // }
-    
     return vertShift;
 }
 
 
 void GraphNode::setLevel (int level)
 {
-    setBounds (getX(), 20 + level * 40, getWidth(), getHeight());
-    
     vertShift = level;
+    
 }
 
 
 int GraphNode::getHorzShift() const
 {
-    return horzShift; //gv->getHorizontalShift(this);
+    return horzShift;
 }
 
 
 void GraphNode::setHorzShift (int shift)
 {
-    setBounds (20 + shift * 140, getY(), getWidth(), getHeight());
-    
     horzShift = shift;
+    
 }
 
+void GraphNode::setWidth(int width)
+{
+    nodeWidth = width;
+}
 
 void GraphNode::mouseEnter (const MouseEvent& m)
 {
@@ -408,7 +325,12 @@ GenericEditor* GraphNode::getDest() const
 
 GenericEditor* GraphNode::getSource() const
 {
-    return editor->getSourceEditor();
+    GenericProcessor* sourceNode = editor->getProcessor()->getSourceNode();
+    
+    if (sourceNode != nullptr)
+        return sourceNode->getEditor();
+    else
+        return nullptr;
 }
 
 
@@ -424,49 +346,81 @@ const String GraphNode::getName() const
 }
 
 
-Point<float> GraphNode::getCenterPoint() const
+juce::Point<float> GraphNode::getCenterPoint() const
 {
-    Point<float> center = Point<float> (getX() + 10, getY() + 10);
+    juce::Point<float> center = juce::Point<float> (getX() + 11, getY() + 10);
     
     return center;
 }
 
 
-void GraphNode::switchIO (int path)
-{
-}
-
-
 void GraphNode::updateBoundaries()
 {
-    int horzShift = gv->getHorizontalShift (this);
+
+    setBounds (BORDER_SIZE + getHorzShift() * NODE_WIDTH,
+               BORDER_SIZE + getLevel() * NODE_HEIGHT,
+               nodeWidth,
+               NODE_HEIGHT);
+}
+
+String GraphNode::getInfoString()
+{
+    GenericProcessor* processor = (GenericProcessor*) editor->getProcessor();
     
-    setBounds (20 + horzShift * 140, 20 + getLevel() * 40, 150, 50);
+    int ch1 = processor->getTotalDataChannels();
+    int ch2 = processor->getTotalEventChannels();
+    int ch3 = processor->getTotalSpikeChannels();
+    
+    String info = "Data channels: ";
+    info += String(ch1);
+    
+    info += "\nEvent channels: ";
+    info += String(ch2);
+    
+    info += "\nSpike channels: ";
+    info += String(ch3);
+    
+    return info;
 }
 
 
 void GraphNode::paint (Graphics& g)
 {
-    Array<bool> recordStatuses = editor->getRecordStatusArray();
-    
-    Path recordPath;
-    
-    const int numRecordStatuses = recordStatuses.size();
-    for (int i = 0; i < numRecordStatuses; ++i)
+    if (isMouseOver)
     {
-        float stepSize      = 2 * float_Pi / numRecordStatuses;
-        float startRadians  = stepSize * i;
-        float endRadians    = startRadians + stepSize;
-        
-        if (recordStatuses[i])
-            recordPath.addPieSegment (0, 0, 20, 20, startRadians, endRadians, 0.5);
+        g.setColour (Colours::yellow);
+        g.fillRoundedRectangle (0, 0, getWidth()-23, NODE_HEIGHT-23, 4);
+    } else {
+        g.setColour (Colour(30,30,30));
+        g.fillRoundedRectangle (0, 0, getWidth()-23, NODE_HEIGHT-23, 4);
     }
     
-    g.setColour (Colours::red);
-    g.fillPath (recordPath);
+    g.setColour(editor->getBackgroundColor());
+    g.fillRoundedRectangle    (1, 1, getWidth()-25, NODE_HEIGHT-25, 3);
     
-    g.setColour (isMouseOver ? Colours::yellow : editor->getBackgroundColor());
-    g.fillEllipse (2, 2, 16, 16);
+    if (isMouseOver)
+    {
+        g.setColour(Colours::yellow);
+        g.drawEllipse(5,5,12,12,1.5);
+        g.setGradientFill(ColourGradient(Colours::yellow,
+                                    11,8,
+                                    Colours::orange,
+                                    20,20,
+                                    true));
+    } else {
+        g.setColour(Colour(30,30,30));
+        g.drawEllipse(5,5,12,12,1.2);
+        g.setGradientFill(ColourGradient(Colours::lightgrey,
+        11,8,
+        Colours::grey,
+        20,20,
+        true));
+    }
+    g.fillEllipse (5.5, 5.5, 11, 11);
     
-    g.drawText (getName(), 25, 0, getWidth() - 25, 20, Justification::left, true);
+    g.setColour (Colours::white); // : editor->getBackgroundColor());
+    g.drawText (String(nodeId) + " " + getName(), 23, 1, getWidth() - 25, 20, Justification::left, true);
+    
+    g.setColour (Colours::black); // : editor->getBackgroundColor());
+    g.drawFittedText (getInfoString(), 10, 25, getWidth() - 5, 70, Justification::left, true);
 }

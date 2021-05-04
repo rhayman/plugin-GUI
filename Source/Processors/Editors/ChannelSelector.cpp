@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "../ProcessorGraph/ProcessorGraph.h"
 #include "../../UI/GraphViewer.h"
 #include "../../Utils/ListSliceParser.h"
+#include "../../Utils/Utils.h"
 
 
 static const Colour COLOUR_DROPDOWN_BUTTON_BG   (Colour::fromRGB (48, 63, 159));
@@ -48,18 +49,19 @@ ChannelSelector::ChannelSelector(bool createButtons, Font& titleFont_) :
     , paramsToggled(true), paramsActive(true), recActive(true), radioStatus(false), isNotSink(createButtons)
     , moveRight(false), moveLeft(false), offsetLR(0), offsetUD(0), desiredOffset(0), titleFont(titleFont_), acquisitionIsActive(false)
 {
-    // initialize buttons
     audioButton = new EditorButton("AUDIO", titleFont);
     audioButton->addListener(this);
     addAndMakeVisible(audioButton);
     if (!createButtons)
         audioButton->setState(false);
 
+    /*
     recordButton = new EditorButton("REC", titleFont);
     recordButton->addListener(this);
     addAndMakeVisible(recordButton);
     if (!createButtons)
         recordButton->setState(false);
+    */
 
     paramsButton = new EditorButton("PARAM", titleFont);
     paramsButton->addListener(this);
@@ -83,7 +85,7 @@ ChannelSelector::ChannelSelector(bool createButtons, Font& titleFont_) :
     // Buttons managers
     // ====================================================================
     addAndMakeVisible (audioButtonsManager);
-    addAndMakeVisible (recordButtonsManager);
+    //addAndMakeVisible (recordButtonsManager);
     addAndMakeVisible (parameterButtonsManager);
 
     // Enable fast mode selection for buttons
@@ -174,7 +176,7 @@ void ChannelSelector::setNumChannels(int numChans)
 {
     int difference = numChans - parameterButtonsManager.getNumButtons();
 
-    // std::cout << difference << " buttons needed." << std::endl;
+LOGDD(difference, " buttons needed.");
 
     if (difference > 0)
     {
@@ -222,7 +224,7 @@ void ChannelSelector::shiftChannelsVertical(float amount)
         offsetUD = jmax(offsetUD, (float)-overallHeight);
     }
 
-    //std::cout << "offsetUD = " << offsetUD << std::endl;
+LOGDD("offsetUD = ", offsetUD);
 
     refreshButtonBoundaries();
 }
@@ -280,10 +282,12 @@ void ChannelSelector::refreshButtonBoundaries()
     /*
       audio,record and param tabs
     */
-    const int tabButtonWidth = getWidth() / 3;
+    //const int tabButtonWidth = getWidth() / 3;
+    const int tabButtonWidth = getWidth() / 2;
+
     audioButton->setBounds  (0, 0, tabButtonWidth, tabButtonHeight);
-    recordButton->setBounds (tabButtonWidth, 0, tabButtonWidth, tabButtonHeight);
-    paramsButton->setBounds (tabButtonWidth * 2, 0, tabButtonWidth, tabButtonHeight);
+    //recordButton->setBounds (tabButtonWidth, 0, tabButtonWidth, tabButtonHeight);
+    paramsButton->setBounds (tabButtonWidth, 0, tabButtonWidth, tabButtonHeight);
 
     /*
       All and None buttons
@@ -299,7 +303,7 @@ void ChannelSelector::resized()
 
 void ChannelSelector::timerCallback()
 {
-    //std::cout << desiredOffset - offsetLR << std::endl;
+LOGDD(desiredOffset - offsetLR);
 
     if (offsetLR != desiredOffset)
     {
@@ -383,7 +387,7 @@ Array<int> ChannelSelector::getActiveChannels()
 
 void ChannelSelector::setActiveChannels(Array<int> a)
 {
-    //std::cout << "Setting active channels!" << std::endl;
+LOGDD("Setting active channels!");
 
     const int numButtons = parameterButtonsManager.getNumButtons();
     for (int i = 0; i < numButtons; ++i)
@@ -625,6 +629,13 @@ void ChannelSelector::buttonClicked(Button* button)
             {
                 parameterButtonsManager.getButtonAt (i)->setToggleState (false, sendNotification);
             }
+            
+            if (radioStatus) // if radio buttons are active
+            {
+                // send a message to parent
+                GenericEditor* editor = (GenericEditor*) getParentComponent();
+                editor->channelChanged (-1, false);
+            }
         }
         else if (offsetLR == audioOffset)
         {
@@ -632,13 +643,6 @@ void ChannelSelector::buttonClicked(Button* button)
             {
                 audioButtonsManager.getButtonAt (i)->setToggleState (false, sendNotification);
             }
-        }
-
-        if (radioStatus) // if radio buttons are active
-        {
-            // send a message to parent
-            GenericEditor* editor = (GenericEditor*) getParentComponent();
-            editor->channelChanged (-1, false);
         }
     }
     else
@@ -654,7 +658,7 @@ void ChannelSelector::buttonClicked(Button* button)
             //int channelNum = editor->getStartChannel() + b->getChannel() - 1;
             bool status = b->getToggleState();
 
-         //   std::cout << "Requesting audio monitor for channel " << ch->nodeIndex + 1 << std::endl;
+//LOGDD("Requesting audio monitor for channel ", ch->nodeIndex + 1);
             
             // change parameter directly on editor
             //     This is another of those ugly things that will go away once the
@@ -687,7 +691,7 @@ void ChannelSelector::buttonClicked(Button* button)
             }
             else     // change parameter directly
             {
-                //std::cout << "Setting record status for channel " << b->getChannel() << std::endl;
+LOGDD("Setting record status for channel ", b->getChannel());
 
 				//This is another of those ugly things that will go away once the
 				//probe recording system is implemented, but is needed to maintain compatibility
@@ -1206,4 +1210,3 @@ void SlicerChannelSelectorComponent::setListener (SlicerChannelSelectorComponent
 {
     m_controlsButtonListener = newListener;
 }
-

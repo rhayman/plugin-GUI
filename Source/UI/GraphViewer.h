@@ -29,88 +29,139 @@
 
 #include "../../JuceLibraryCode/JuceHeader.h"
 
-/**
- 
- Displays the full processor graph for a given session.
- 
- Inhabits a tab in the DataViewport.
- 
- @see UIComponent, DataViewport, ProcessorGraph, EditorViewport
- 
- */
 
+/**
+ Represents an individual processor/plugin in the GraphViewer.
+ 
+ @see GraphViewer
+*/
 
 class GraphNode : public Component
 {
 public:
+    
+    /** Constructor */
     GraphNode (GenericEditor* editor, GraphViewer* g);
+    
+    /** Destructor */
     ~GraphNode();
     
+    /** Paint component */
     void paint (Graphics& g)    override;
     
+    /** Behavior on start of mouse hover */
     void mouseEnter (const MouseEvent& event) override;
+    
+    /** Behavior on end of mouse hover */
     void mouseExit  (const MouseEvent& event) override;
+    
+    /** Behavior on mouse click */
     void mouseDown  (const MouseEvent& event) override;
     
+    /** Indicates whether node has an editor component */
     bool hasEditor (GenericEditor* editor) const;
     
-    Point<float> getCenterPoint() const;
+    /** Returns location of component center point */
+    juce::Point<float> getCenterPoint() const;
+    
+    /** Returns editor of downstream node */
     GenericEditor* getDest()    const;
+    
+    /** Returns editor of upstream node */
     GenericEditor* getSource()  const;
+    
+    /** Returns array of editors for all connected nodes (splitter and merger only) */
     Array<GenericEditor*> getConnectedEditors() const;
     
+    /** Returns true if node is a splitter */
     bool isSplitter() const;
+    
+    /** Returns true if node is a merger */
     bool isMerger()   const;
     
+    /** Returns name of the underlying processor */
     const String getName() const;
     
+    /** Returns level (y-position) of node in graph display */
     int getLevel()     const;
+    
+    /** Returns horizontal shift (x-position of node in graph display */
     int getHorzShift() const;
     
+    /** Sets the level (y-position) of node in graph display */
     void setLevel (int newLevel);
+    
+    /** Sets the width of node in graph display */
+    void setWidth (int newWidth);
+    
+    /** Sets the horizontal shift (x-position of node in graph display) */
     void setHorzShift (int newHorizontalShift);
     
-    void updateBoundaries();
-    void switchIO (int path);
+    /** Not currently used (consider deleting) */
+    //void switchIO (int path);
     
-    int horzShift;
-    int vertShift;
+    void updateBoundaries();
     
 private:
     GenericEditor* editor;
     GraphViewer* gv;
     
+    
+    
+    String getInfoString();
+    
     bool isMouseOver;
+    int horzShift;
+    int vertShift;
+    int nodeWidth;
+    
+    int nodeId;
 };
 
+/**
 
+ Displays the full processor graph for a given session.
+
+ Inhabits a tab in the DataViewport, and allows the user to select processor editors by clicking on their icons inside the graph.
+
+@see UIComponent, DataViewport, ProcessorGraph, EditorViewport
+
+*/
 class GraphViewer : public Component
 {
 public:
+    
+    /** Constructor */
     GraphViewer();
+    
+    /** Destructor */
     ~GraphViewer();
     
     /** Draws the GraphViewer.*/
     void paint (Graphics& g)    override;
     
-    void addNode    (GenericEditor* editor);
-    void removeNode (GenericEditor* editor);
-    void removeAllNodes();
-    void updateNodeLocations();
+    /** Adds a graph node for a particular processor */
+    void updateNodes    (Array<GenericProcessor*> rootProcessors);
     
-    int nodesAtLevel (int lvl) const;
-    int getHorizontalShift (GraphNode*) const;
+    /** Adds a graph node for a particular processor */
+    void addNode    (GenericEditor* editor, int level, int offset);
+    
+    /** Clears the graph */
+    void removeAllNodes();
+    
+    /** Returns the graph node for a particular processor editor */
     GraphNode* getNodeForEditor (GenericEditor* editor) const;
     
+    int getIndexOfEditor(GenericEditor* editor) const;
+    
+    /** Checks if a node exists for a given processor*/
+    bool nodeExists(GenericProcessor* processor);
     
 private:
     void connectNodes (int, int, Graphics&);
-    void checkLayout (GraphNode*);
-    
-    int getIndexOfEditor (GenericEditor* editor) const;
-    
+
     int rootNum;
-    
+
     String currentVersionText;
     
     OwnedArray<GraphNode> availableNodes;

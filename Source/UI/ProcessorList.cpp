@@ -30,6 +30,8 @@
 #include "../Processors/ProcessorManager/ProcessorManager.h"
 #include "../Processors/ProcessorGraph/ProcessorGraph.h"
 
+#include "../Utils/Utils.h"
+
 
 enum colorIds
 {
@@ -38,6 +40,8 @@ enum colorIds
 	SINK_COLOR = 803,
 	SOURCE_COLOR = 804,
 	UTILITY_COLOR = 805,
+	RECORD_COLOR = 806,
+	AUDIO_COLOR = 807
 };
 
 	ProcessorList::ProcessorList()
@@ -53,10 +57,17 @@ enum colorIds
 	setColour(SINK_COLOR, Colour(0, 166, 81));
 	setColour(SOURCE_COLOR, Colour(241, 90, 41));
 	setColour(UTILITY_COLOR, Colour(147, 149, 152));
+	setColour(RECORD_COLOR, Colour(255, 0, 0));
+	setColour(AUDIO_COLOR, Colour(0,0,0));
+
 	ProcessorListItem* sources = new ProcessorListItem("Sources");
 	ProcessorListItem* filters = new ProcessorListItem("Filters");
 	ProcessorListItem* sinks = new ProcessorListItem("Sinks");
 	ProcessorListItem* utilities = new ProcessorListItem("Utilities");
+	ProcessorListItem* record = new ProcessorListItem("Recording");
+	//TODO:
+	//ProcessorListItem* audio = new ProcessorListItem("Audio");
+
 
 
 	baseItem = new ProcessorListItem("Processors");
@@ -64,6 +75,9 @@ enum colorIds
 	baseItem->addSubItem(filters);
 	baseItem->addSubItem(sinks);
 	baseItem->addSubItem(utilities);
+	baseItem->addSubItem(record);
+	//TODO:
+	//baseItem->addSubItem(audio);
 
 	// set parent names / colors
 	baseItem->setParentName("Processors");
@@ -255,8 +269,8 @@ ProcessorListItem* ProcessorList::getListItemForYPos(int y)
 {
 	int bottom = (yBuffer + itemHeight); // - getScrollAmount();
 
-	//std::cout << "Bottom: " << bottom << std::endl;
-	//std::cout << "Y coordinate: " << y << std::endl;
+LOGDD("Bottom: ", bottom);
+LOGDD("Y coordinate: ", y);
 
 	if (y < bottom)
 	{
@@ -318,7 +332,7 @@ void ProcessorList::setViewport(Graphics& g, bool hasSubItems)
 
 	totalHeight += yBuffer + height;
 
-	//std::cout << totalHeight << std::endl;
+LOGDD(totalHeight);
 }
 
 int ProcessorList::getTotalHeight()
@@ -339,17 +353,17 @@ void ProcessorList::mouseDown(const MouseEvent& e)
 
 	isDragging = false;
 
-	Point<int> pos = e.getPosition();
+	juce::Point<int> pos = e.getPosition();
 	int xcoord = pos.getX();
 	int ycoord = pos.getY();
 
-	//std::cout << xcoord << " " << ycoord << std::endl;
+LOGDD(xcoord, " ", ycoord);
 
 	ProcessorListItem* listItem = getListItemForYPos(ycoord);
 
 	if (listItem != 0)
 	{
-		//std::cout << "Selecting: " << fli->getName() << std::endl;
+LOGDD("Selecting: ", listItem->getName());
 		if (!listItem->hasSubItems())
 		{
 			clearSelectionState();
@@ -359,7 +373,7 @@ void ProcessorList::mouseDown(const MouseEvent& e)
 	}
 	else
 	{
-		//std::cout << "No selection." << std::endl;
+LOGDD("No selection.");
 	}
 
 	if (listItem != 0)
@@ -384,6 +398,10 @@ void ProcessorList::mouseDown(const MouseEvent& e)
 				else if (listItem->getName().equalsIgnoreCase("Sinks"))
 				{
 					currentColor = SINK_COLOR;
+				}
+				else if (listItem->getName().equalsIgnoreCase("Record Node"))
+				{
+					currentColor = RECORD_COLOR;
 				}
 				else
 				{
@@ -466,7 +484,7 @@ void ProcessorList::mouseDrag(const MouseEvent& e)
 
 				const String dragDescription = b;
 
-				//std::cout << dragDescription << std::endl;
+LOGDD(dragDescription);
 
 				if (dragDescription.isNotEmpty())
 				{
@@ -488,15 +506,14 @@ void ProcessorList::mouseDrag(const MouseEvent& e)
 
 						dragImage.multiplyAllAlphas(0.6f);
 
-						Point<int> imageOffset(20,10);
+						juce::Point<int> imageOffset(20,10);
 
-						//See ProcessorGraph::createProcesorFromDescription for description info
 						Array<var> dragData;
-						dragData.add(true);
-						dragData.add(dragDescription);
-						dragData.add(listItem->processorType);
-						dragData.add(listItem->processorId);
-						dragData.add(listItem->getParentName());
+						dragData.add(true); // fromProcessorList
+						dragData.add(dragDescription); // processorName
+						dragData.add(listItem->processorType); // processorType
+						dragData.add(listItem->processorId);  // processorIndex
+						dragData.add(listItem->getParentName()); // libName
 
 						dragContainer->startDragging(dragData, this,
 								dragImage, true, &imageOffset);
@@ -512,7 +529,7 @@ void ProcessorList::saveStateToXml(XmlElement* xml)
 {
 	XmlElement* processorListState = xml->createNewChildElement("PROCESSORLIST");
 
-	for (int i = 0; i < 5; i++)
+	for (int i = 0; i < 7; i++)
 	{
 		XmlElement* colorState = processorListState->createNewChildElement("COLOR");
 
@@ -534,6 +551,12 @@ void ProcessorList::saveStateToXml(XmlElement* xml)
 				break;
 			case 4:
 				id = UTILITY_COLOR;
+				break;
+			case 5: 
+				id = RECORD_COLOR;
+				break;
+			case 6:
+				id = AUDIO_COLOR;
 				break;
 			default:
 				// do nothing
@@ -581,6 +604,8 @@ Array<Colour> ProcessorList::getColours()
 	c.add(findColour(FILTER_COLOR));
 	c.add(findColour(SINK_COLOR));
 	c.add(findColour(UTILITY_COLOR));
+	c.add(findColour(RECORD_COLOR));
+	c.add(findColour(AUDIO_COLOR));
 	return c;
 }
 
@@ -605,6 +630,11 @@ void ProcessorList::setColours(Array<Colour> c)
 			case 4:
 				setColour(UTILITY_COLOR, c[i]);
 				break;
+			case 5: 
+				setColour(RECORD_COLOR, c[i]);
+				break;
+			case 6: 
+				setColour(AUDIO_COLOR, c[i]);
 			default:
 				;// do nothing
 		}
@@ -618,6 +648,8 @@ void ProcessorList::fillItemList()
 	baseItem->getSubItem(1)->clearSubItems(); //Filters
 	baseItem->getSubItem(2)->clearSubItems(); //sinks
 	baseItem->getSubItem(3)->clearSubItems(); //Utilities
+	baseItem->getSubItem(4)->clearSubItems(); //Record
+	//baseItem->getSubItem(5)->clearSubItems(); //Audio
 
 	for (int pClass = 0; pClass < 3; pClass++)
 	{
@@ -629,7 +661,15 @@ void ProcessorList::fillItemList()
 			ProcessorManager::getProcessorNameAndType((ProcessorClasses)pClass, i, name, type);
 			if (type > -1 && type < 4)
 			{
-				baseItem->getSubItem(type)->addSubItem(new ProcessorListItem(name, i, pClass));
+				if (name == "Record Node")
+				{
+					baseItem->getSubItem(4)->addSubItem(new ProcessorListItem(name, i, pClass));
+				}
+				else
+				{
+					baseItem->getSubItem(type)->addSubItem(new ProcessorListItem(name, i, pClass));
+				}
+
 			}
 		}
 	}
@@ -734,6 +774,14 @@ void ProcessorListItem::setParentName(const String& name)
 	else if (parentName.equalsIgnoreCase("Sources"))
 	{
 		colorId = SOURCE_COLOR;
+	}
+	else if (parentName.equalsIgnoreCase("Recording"))
+	{
+		colorId = RECORD_COLOR;
+	}
+	else if (parentName.equalsIgnoreCase("Audio"))
+	{
+		colorId = AUDIO_COLOR;
 	}
 	else
 	{

@@ -206,7 +206,10 @@ bool RHD2000Thread::usesCustomNames() const
 
 unsigned int RHD2000Thread::getNumSubProcessors() const
 {
-	return 1;
+	if (deviceFound)
+		return 1;
+	else
+		return 0;
 }
 
 void RHD2000Thread::setDACthreshold(int dacOutput, float threshold)
@@ -1081,8 +1084,7 @@ void RHD2000Thread::setFastTTLSettle(bool state, int channel)
 int RHD2000Thread::setNoiseSlicerLevel(int level)
 {
     desiredNoiseSlicerLevel = level;
-    if (deviceFound)
-        evalBoard->setAudioNoiseSuppress(desiredNoiseSlicerLevel);
+    dacOutputShouldChange = true;
 
     // Level has been checked once before this and then is checked again in setAudioNoiseSuppress.
     // This may be overkill - maybe API should change so that the final function returns the value?
@@ -1207,6 +1209,8 @@ void RHD2000Thread::enableAdcs(bool t)
     acquireAdcChannels = t;
 
     sourceBuffers[0]->resize (getNumChannels(), 10000);
+
+	sn->update();
 }
 
 
@@ -1671,6 +1675,7 @@ bool RHD2000Thread::updateBuffer()
         evalBoard->setExternalFastSettleChannel(fastSettleTTLChannel);
         evalBoard->setDacHighpassFilter(desiredDAChpf);
         evalBoard->enableDacHighpassFilter(desiredDAChpfState);
+        evalBoard->setAudioNoiseSuppress(desiredNoiseSlicerLevel);
 
         dacOutputShouldChange = false;
     }

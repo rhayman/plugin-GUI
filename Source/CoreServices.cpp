@@ -40,7 +40,7 @@ namespace CoreServices
 {
 	void updateSignalChain(GenericEditor* source)
 	{
-		getEditorViewport()->makeEditorVisible(source, false, true);
+		getProcessorGraph()->updateSettings(source->getProcessor());
 	}
 
 	bool getRecordingStatus()
@@ -106,6 +106,16 @@ namespace CoreServices
 	void setRecordingDirectory(String dir)
 	{
 		getControlPanel()->setRecordingDirectory(dir);
+		//Updates path in all record nodes, only when programatically calling the method
+		for (auto* node : getProcessorGraph()->getRecordNodes())
+		{
+			static_cast<RecordNodeEditor*>(node->getEditor())->setDataDirectory(dir);
+		}
+	}
+
+	File getRecordingDirectory()
+	{
+		return getControlPanel()->getRecordingDirectory();
 	}
 
 	void createNewRecordingDir()
@@ -123,6 +133,11 @@ namespace CoreServices
 		getControlPanel()->setAppendText(text);
 	}
 
+	std::vector<RecordEngineManager*> getAvailableRecordEngines()
+	{
+		return getControlPanel()->getAvailableRecordEngines();
+	}
+
 	String getSelectedRecordEngineId()
 	{
 		return getControlPanel()->getSelectedRecordEngineId();
@@ -133,28 +148,66 @@ namespace CoreServices
 		return getControlPanel()->setSelectedRecordEngineId(id);
 	}
 
+	int getSelectedRecordEngineIdx()
+	{
+		return getControlPanel()->recordSelector->getSelectedId();
+	}
+
 	namespace RecordNode
 	{
+
 		void createNewrecordingDir()
 		{
-			getProcessorGraph()->getRecordNode()->createNewDirectory();
+			for (auto* node : getProcessorGraph()->getRecordNodes())
+			{
+				node->createNewDirectory();
+			}
 		}
 
-		File getRecordingPath()
-		{
-			return getProcessorGraph()->getRecordNode()->getDataDirectory();
-		}
-
+		//TODO: This needs to be well-defined...just testing for now P.K.
 		int getRecordingNumber()
 		{
-			return getProcessorGraph()->getRecordNode()->getRecordingNumber();
+			int lastRecordingNum = -1;
+
+			for (auto* node : getProcessorGraph()->getRecordNodes())
+			{
+				lastRecordingNum = node->getRecordingNumber();
+			}
+
+			return lastRecordingNum;
+		}
+		
+		File getRecordingPath()
+		{
+			return File();
 		}
 
 		int getExperimentNumber()
 		{
-			return getProcessorGraph()->getRecordNode()->getExperimentNumber();
+			
+			int experimentNumber = -1;
+
+			for (auto* node : getProcessorGraph()->getRecordNodes())
+			{
+				experimentNumber = node->getExperimentNumber();
+			}
+
+			return experimentNumber;
 		}
 
+		bool getRecordThreadStatus()
+		{
+			
+			for (auto* node : getProcessorGraph()->getRecordNodes())
+			{
+				if (node->getRecordThreadStatus())
+					return true;
+			}
+
+			return false;
+		}
+
+		/*
 		void writeSpike(const SpikeEvent* spike, const SpikeChannel* chan)
 		{
 			getProcessorGraph()->getRecordNode()->writeSpike(spike, chan);
@@ -169,6 +222,7 @@ namespace CoreServices
 		{
 			return getProcessorGraph()->getRecordNode()->addSpikeElectrode(elec);
 		}
+		*/
 
 	};
 
@@ -180,14 +234,40 @@ namespace CoreServices
 	File getDefaultUserSaveDirectory()
 	{
 #if defined(__APPLE__)
-		File dir = File::getSpecialLocation(File::userDocumentsDirectory).getChildFile("open-ephys");
+    	const File dir = File::getSpecialLocation(File::userDocumentsDirectory).getChildFile("Open Ephys");
+#elif _WIN32
+    	const File dir = File::getSpecialLocation(File::userDocumentsDirectory).getChildFile("Open Ephys");
+#else
+    	const File dir = File::getSpecialLocation(File::userHomeDirectory).getChildFile("open-ephys");
+#endif
 		if (!dir.isDirectory()) {
 			dir.createDirectory();
 		}
 		return std::move(dir);
+	}
+
+	File getSavedStateDirectory() {
+#if defined(__APPLE__)
+    	File dir = File::getSpecialLocation(File::userApplicationDataDirectory).getChildFile("Application Support/open-ephys");
+#elif _WIN32
+    	String appDir = File::getSpecialLocation(File::currentApplicationFile).getFullPathName();
+		File dir;
+		if(appDir.contains("plugin-GUI\\Build\\"))
+			dir = File::getSpecialLocation(File::currentApplicationFile).getParentDirectory();
+		else
+			dir = File::getSpecialLocation(File::commonApplicationDataDirectory).getChildFile("Open Ephys");
 #else
-		return File::getCurrentWorkingDirectory();
+		String appDir = File::getSpecialLocation(File::currentApplicationFile).getFullPathName();
+		File dir;
+		if(appDir.contains("plugin-GUI/Build/"))
+			dir = File::getSpecialLocation(File::currentApplicationFile).getParentDirectory();
+		else
+			dir = File::getSpecialLocation(File::userApplicationDataDirectory).getChildFile(".open-ephys");;
 #endif
+		if (!dir.isDirectory()) {
+			dir.createDirectory();
+		}
+    	return std::move(dir);
 	}
 
 	String getGUIVersion()

@@ -29,6 +29,7 @@
 #include "ControlPanel.h"
 #include "ProcessorList.h"
 #include "EditorViewport.h"
+#include "MessageCenterButton.h"
 #include "DataViewport.h"
 #include "../Processors/MessageCenter/MessageCenterEditor.h"
 #include "GraphViewer.h"
@@ -37,7 +38,7 @@
 #include "../MainWindow.h"
 
 	UIComponent::UIComponent(MainWindow* mainWindow_, ProcessorGraph* pgraph, AudioComponent* audio_)
-: mainWindow(mainWindow_), processorGraph(pgraph), audio(audio_)
+: mainWindow(mainWindow_), processorGraph(pgraph), audio(audio_), messageCenterIsCollapsed(true)
 
 {
 
@@ -45,46 +46,53 @@
 
 	messageCenterEditor = (MessageCenterEditor*) processorGraph->getMessageCenter()->createEditor();
 	addActionListener(messageCenterEditor);
-	addAndMakeVisible(messageCenterEditor);
-	std::cout << "Created message center." << std::endl;
+	
+LOGD("Created message center.");
 
 	infoLabel = new InfoLabel();
-	std::cout << "Created info label." << std::endl;
+LOGD("Created info label.");
 
 	graphViewer = new GraphViewer();
-	std::cout << "Created graph viewer." << std::endl;
+LOGD("Created graph viewer.");
 
 	dataViewport = new DataViewport();
 	addChildComponent(dataViewport);
 	dataViewport->addTabToDataViewport("Info", infoLabel,0);
 	dataViewport->addTabToDataViewport("Graph", graphViewer,0);
 
-	std::cout << "Created data viewport." << std::endl;
+LOGD("Created data viewport.");
 
-	editorViewport = new EditorViewport();
-
-	addAndMakeVisible(editorViewport);
-
-	std::cout << "Created filter viewport." << std::endl;
+    signalChainTabComponent = new SignalChainTabComponent();
+    addAndMakeVisible(signalChainTabComponent);
+    
+	editorViewport = new EditorViewport(signalChainTabComponent);
+	//addAndMakeVisible(editorViewport);
+    
+LOGD("Created editor viewport.");
 
 	editorViewportButton = new EditorViewportButton(this);
 	addAndMakeVisible(editorViewportButton);
 
 	controlPanel = new ControlPanel(processorGraph, audio);
 	addAndMakeVisible(controlPanel);
-
-	std::cout << "Created control panel." << std::endl;
+    
+LOGD("Created control panel.");
 
 	processorList = new ProcessorList();
 	processorListViewport.setViewedComponent(processorList,false);
 	processorListViewport.setScrollBarsShown(true,false);
 	addAndMakeVisible(&processorListViewport);
+    
+    messageCenterButton.addListener(this);
+    addAndMakeVisible(messageCenterEditor);
+    addAndMakeVisible(&messageCenterButton);
+    
 	processorList->setVisible(true);
 	processorList->setBounds(0,0,195,processorList->getTotalHeight());
-	std::cout << "Created filter list." << std::endl;
+LOGD("Created filter list.");
 
 	pluginManager = new PluginManager();
-	std::cout << "Created plugin manager" << std::endl;
+LOGD("Created plugin manager");
 
 	setBounds(0,0,500,400);
 
@@ -102,6 +110,7 @@
 	mainWindow->setMenuBar(0);
 #else
 	mainWindow->setMenuBar(this);
+	mainWindow->getMenuBarComponent()->setName("MainMenu");
 #endif
 
 }
@@ -174,13 +183,30 @@ PluginManager* UIComponent::getPluginManager()
 	return pluginManager;
 }
 
+PluginInstaller* UIComponent::getPluginInstaller()
+{
+    return pluginInstaller;
+}
+
+void UIComponent::buttonClicked(Button* button)
+{
+    if (button == &messageCenterButton)
+    {
+        messageCenterButton.switchState();
+        
+        messageCenterIsCollapsed = !messageCenterIsCollapsed;
+        
+        resized();
+    }
+}
+
 void UIComponent::resized()
 {
 
 	int w = getWidth();
 	int h = getHeight();
 
-	if (editorViewportButton != 0)
+	if (editorViewportButton != nullptr)
 	{
 		editorViewportButton->setBounds(w-230, h-40, 225, 35);
 
@@ -189,28 +215,24 @@ void UIComponent::resized()
 
 		if (h < 200)
 			editorViewportButton->setBounds(w-230,h-40+200-h,225,35);
-		//else
-		//    editorViewportButton->setVisible(true);
 	}
 
-	if (editorViewport != 0)
+	if (signalChainTabComponent != nullptr)
 	{
-		//if (h < 400)
-		//    editorViewport->setVisible(false);
-		//else
-		//    editorViewport->setVisible(true);
-
-		if (editorViewportButton->isOpen() && !editorViewport->isVisible())
-			editorViewport->setVisible(true);
-		else if (!editorViewportButton->isOpen() && editorViewport->isVisible())
-			editorViewport->setVisible(false);
-
-		editorViewport->setBounds(6,h-190,w-11,150);
-
-
+		if (editorViewportButton->isOpen() && !signalChainTabComponent->isVisible())
+        {
+            signalChainTabComponent->setVisible(true);
+        }
+			
+		else if (!editorViewportButton->isOpen() && signalChainTabComponent->isVisible())
+        {
+            signalChainTabComponent->setVisible(false);
+        }
+			
+		signalChainTabComponent->setBounds(6,h-200,w-11,160);
 	}
 
-	if (controlPanel != 0)
+	if (controlPanel != nullptr)
 	{
 
 		int controlPanelWidth = w-210;
@@ -249,12 +271,12 @@ void UIComponent::resized()
 			controlPanel->setBounds(leftBound,6,controlPanelWidth,32+addHeight);
 	}
 
-	if (processorList != 0)
+	if (processorList != nullptr)
 	{
 		if (processorList->isOpen())
 		{
 			if (editorViewportButton->isOpen())
-				processorListViewport.setBounds(5,5,195,h-200);
+				processorListViewport.setBounds(5,5,195,h-210);
 			else
 				processorListViewport.setBounds(5,5,195,h-50);
 
@@ -272,7 +294,7 @@ void UIComponent::resized()
 			processorListViewport.setBounds(5-460+getWidth(),5,195,processorList->getHeight());
 	}
 
-	if (dataViewport != 0)
+	if (dataViewport != nullptr)
 	{
 		int left, top, width, height;
 		left = 6;
@@ -286,7 +308,7 @@ void UIComponent::resized()
 		top = controlPanel->getHeight()+8;
 
 		if (editorViewportButton->isOpen())
-			height = h - top - 195;
+			height = h - top - 205;
 		else
 			height = h - top - 45;
 
@@ -301,16 +323,26 @@ void UIComponent::resized()
 
 	}
 
-
-
-	if (messageCenterEditor != 0)
+	if (messageCenterEditor != nullptr)
 	{
-		messageCenterEditor->setBounds(6,h-35,w-241,30);
-		if (h < 200)
-			messageCenterEditor->setBounds(6,h-35+200-h,w-241,30);
-		//  else
-		//      messageCenter->setVisible(true);
+        if (messageCenterIsCollapsed)
+        {
+            messageCenterEditor->collapse();
+            messageCenterEditor->setBounds(6,h-35,w-241,30);
+            
+        } else {
+            messageCenterEditor->expand();
+            messageCenterEditor->setBounds(6,h-305,w-241,300);
+        }
 	}
+    
+
+    //if (messageCenterIsCollapsed)
+   // {
+    messageCenterButton.setBounds((w-241)/2,h-35,30,30);
+   // } else {
+   //     messageCenterButton.setBounds((w-241)/2,h-305,30,30);
+   // }
 
 	// for debugging purposes:
 	if (false)
@@ -365,11 +397,17 @@ PopupMenu UIComponent::getMenuForIndex(int menuIndex, const String& menuName)
 
 	if (menuIndex == 0)
 	{
-		menu.addCommandItem(commandManager, openConfiguration);
-		menu.addCommandItem(commandManager, saveConfiguration);
-		menu.addCommandItem(commandManager, saveConfigurationAs);
-		menu.addSeparator();
+		menu.addCommandItem(commandManager, openSignalChain);
+        menu.addSeparator();
+		menu.addCommandItem(commandManager, saveSignalChain);
+		menu.addCommandItem(commandManager, saveSignalChainAs);
+		//menu.addSeparator();
+       // menu.addCommandItem(commandManager, loadPluginSettings);
+        //menu.addCommandItem(commandManager, savePluginSettings);
+        menu.addSeparator();
 		menu.addCommandItem(commandManager, reloadOnStartup);
+		menu.addSeparator();
+		menu.addCommandItem(commandManager, openPluginInstaller);
 
 #if !JUCE_MAC
 		menu.addSeparator();
@@ -426,9 +464,11 @@ ApplicationCommandTarget* UIComponent::getNextCommandTarget()
 
 void UIComponent::getAllCommands(Array <CommandID>& commands)
 {
-	const CommandID ids[] = {openConfiguration,
-		saveConfiguration,
-		saveConfigurationAs,
+	const CommandID ids[] = {openSignalChain,
+		saveSignalChain,
+		saveSignalChainAs,
+        loadPluginSettings,
+        savePluginSettings,
 		reloadOnStartup,
 		undo,
 		redo,
@@ -440,7 +480,8 @@ void UIComponent::getAllCommands(Array <CommandID>& commands)
 		toggleFileInfo,
 		showHelp,
 		resizeWindow,
-		openTimestampSelectionWindow
+		openTimestampSelectionWindow,
+		openPluginInstaller
 	};
 
 	commands.addArray(ids, numElementsInArray(ids));
@@ -454,21 +495,30 @@ void UIComponent::getCommandInfo(CommandID commandID, ApplicationCommandInfo& re
 
 	switch (commandID)
 	{
-		case openConfiguration:
-			result.setInfo("Open...", "Load a saved processor graph.", "General", 0);
+		case openSignalChain:
+			result.setInfo("Open...", "Open a saved signal chain.", "General", 0);
 			result.addDefaultKeypress('O', ModifierKeys::commandModifier);
 			result.setActive(!acquisitionStarted);
 			break;
 
-		case saveConfiguration:
-			result.setInfo("Save", "Save the current processor graph.", "General", 0);
+		case saveSignalChain:
+			result.setInfo("Save", "Save the current signal chain.", "General", 0);
 			result.addDefaultKeypress('S', ModifierKeys::commandModifier);
 			break;
 
-		case saveConfigurationAs:
-			result.setInfo("Save as...", "Save the current processor graph with a new name.", "General", 0);
+		case saveSignalChainAs:
+			result.setInfo("Save as...", "Save the current signal chain with a new name.", "General", 0);
 			result.addDefaultKeypress('S', ModifierKeys::commandModifier | ModifierKeys::shiftModifier);
 			break;
+            
+        case loadPluginSettings:
+            result.setInfo("Load plugin settings...", "Load saved plugin settings.", "General", 0);
+            result.setActive(!acquisitionStarted);
+            break;
+
+        case savePluginSettings:
+            result.setInfo("Save plugin settings...", "Save the settings of the selected plugin.", "General", 0);
+            break;
 
 		case reloadOnStartup:
 			result.setInfo("Reload on startup", "Load the last used configuration on startup.", "General", 0);
@@ -479,25 +529,25 @@ void UIComponent::getCommandInfo(CommandID commandID, ApplicationCommandInfo& re
 		case undo:
 			result.setInfo("Undo", "Undo the last action.", "General", 0);
 			result.addDefaultKeypress('Z', ModifierKeys::commandModifier);
-			result.setActive(false);
+			result.setActive(!acquisitionStarted && getEditorViewport()->undoManager.canUndo());
 			break;
 
 		case redo:
 			result.setInfo("Redo", "Undo the last action.", "General", 0);
-			result.addDefaultKeypress('Y', ModifierKeys::commandModifier);
-			result.setActive(false);
+			result.addDefaultKeypress('Z', ModifierKeys::commandModifier | ModifierKeys::shiftModifier);
+			result.setActive(!acquisitionStarted && getEditorViewport()->undoManager.canRedo());
 			break;
 
 		case copySignalChain:
-			result.setInfo("Copy", "Copy a portion of the signal chain.", "General", 0);
+			result.setInfo("Copy", "Copy selected processors.", "General", 0);
 			result.addDefaultKeypress('C', ModifierKeys::commandModifier);
-			result.setActive(false);
+			result.setActive(!acquisitionStarted && getEditorViewport()->editorIsSelected());
 			break;
 
 		case pasteSignalChain:
-			result.setInfo("Paste", "Paste a portion of the signal chain.", "General", 0);
+			result.setInfo("Paste", "Paste processors.", "General", 0);
 			result.addDefaultKeypress('V', ModifierKeys::commandModifier);
-			result.setActive(false);
+			result.setActive(!acquisitionStarted && getEditorViewport()->canPaste());
 			break;
 
 		case clearSignalChain:
@@ -528,6 +578,11 @@ void UIComponent::getCommandInfo(CommandID commandID, ApplicationCommandInfo& re
 			result.setInfo("Timestamp Source", "Show timestamp source selection window.", "General", 0);
 			break;
 
+		case openPluginInstaller:
+			result.setInfo("Plugin Installer", "Launch the plugin installer.", "General", 0);
+			result.addDefaultKeypress('P', ModifierKeys::commandModifier);
+			break;
+
 		case showHelp:
 			result.setInfo("Show help...", "Take me to the GUI wiki.", "General", 0);
 			result.setActive(true);
@@ -548,9 +603,9 @@ bool UIComponent::perform(const InvocationInfo& info)
 
 	switch (info.commandID)
 	{
-		case openConfiguration:
+		case openSignalChain:
 			{
-				FileChooser fc("Choose a file to load...",
+				FileChooser fc("Choose a settings file to load...",
 						CoreServices::getDefaultUserSaveDirectory(),
 						"*",
 						true);
@@ -562,12 +617,12 @@ bool UIComponent::perform(const InvocationInfo& info)
 				}
 				else
 				{
-					sendActionMessage("No configuration selected.");
+					sendActionMessage("No file selected.");
 				}
 
 				break;
 			}
-		case saveConfiguration:
+		case saveSignalChain:
 			{
 
 				if (currentConfigFile.exists())
@@ -584,7 +639,7 @@ bool UIComponent::perform(const InvocationInfo& info)
 					if (fc.browseForFileToSave(true))
 					{
 						currentConfigFile = fc.getResult();
-						std::cout << currentConfigFile.getFileName() << std::endl;
+						LOGD(currentConfigFile.getFileName());
 						sendActionMessage(getEditorViewport()->saveState(currentConfigFile));
 					}
 					else
@@ -596,7 +651,7 @@ bool UIComponent::perform(const InvocationInfo& info)
 				break;
 			}
 
-		case saveConfigurationAs:
+		case saveSignalChainAs:
 			{
 
 				FileChooser fc("Choose the file name...",
@@ -607,7 +662,7 @@ bool UIComponent::perform(const InvocationInfo& info)
 				if (fc.browseForFileToSave(true))
 				{
 					currentConfigFile = fc.getResult();
-					std::cout << currentConfigFile.getFileName() << std::endl;
+					LOGD(currentConfigFile.getFileName());
 					sendActionMessage(getEditorViewport()->saveState(currentConfigFile));
 				}
 				else
@@ -617,6 +672,47 @@ bool UIComponent::perform(const InvocationInfo& info)
 
 				break;
 			}
+            
+        case loadPluginSettings:
+        {
+            FileChooser fc("Choose a settings file to load...",
+                    CoreServices::getDefaultUserSaveDirectory(),
+                    "*",
+                    true);
+
+            if (fc.browseForFileToOpen())
+            {
+                currentConfigFile = fc.getResult();
+                sendActionMessage(getEditorViewport()->loadPluginState(currentConfigFile));
+            }
+            else
+            {
+                sendActionMessage("No file selected.");
+            }
+
+            break;
+        }
+        case savePluginSettings:
+        {
+
+            FileChooser fc("Choose the file name...",
+                    CoreServices::getDefaultUserSaveDirectory(),
+                    "*",
+                    true);
+
+            if (fc.browseForFileToSave(true))
+            {
+                currentConfigFile = fc.getResult();
+                LOGD(currentConfigFile.getFileName());
+                sendActionMessage(getEditorViewport()->savePluginState(currentConfigFile));
+            }
+            else
+            {
+                sendActionMessage("No file chosen.");
+            }
+
+            break;
+        }
 
 		case reloadOnStartup:
 			{
@@ -625,6 +721,30 @@ bool UIComponent::perform(const InvocationInfo& info)
 			}
 			break;
 
+        case undo:
+            {
+                getEditorViewport()->undo();
+                break;
+            }
+            
+        case redo:
+            {
+                getEditorViewport()->redo();
+                break;
+            }
+            
+        case copySignalChain:
+            {
+                getEditorViewport()->copySelectedEditors();
+                break;
+            }
+            
+        case pasteSignalChain:
+            {
+                getEditorViewport()->paste();
+                break;
+            }
+                
 		case clearSignalChain:
 			{
 				getEditorViewport()->clearSignalChain();
@@ -661,6 +781,19 @@ bool UIComponent::perform(const InvocationInfo& info)
 			}
 			timestampWindow->setVisible(true);
 			timestampWindow->toFront(true);
+			break;
+
+		case openPluginInstaller:
+			{
+				if (pluginInstaller == nullptr)
+				{
+					pluginInstaller = new PluginInstaller(this->mainWindow);
+				}
+				pluginInstaller->setVisible(true);
+				pluginInstaller->toFront(true);
+				break;
+			}
+
 		default:
 			break;
 

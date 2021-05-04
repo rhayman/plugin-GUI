@@ -22,6 +22,7 @@
 
 #include "DataThread.h"
 #include "../SourceNode/SourceNode.h"
+#include "../../Utils/Utils.h"
 
 
 DataThread::DataThread (SourceNode* s)
@@ -53,9 +54,9 @@ void DataThread::run()
         {
             const MessageManagerLock mmLock (Thread::getCurrentThread());
 
-            std::cout << "Aquisition error...stopping thread." << std::endl;
+            LOGD("Aquisition error...stopping thread.");
             signalThreadShouldExit();
-            std::cout << "Notifying source node to stop acqusition." << std::endl;
+            LOGD("Notifying source node to stop acqusition.");
             sn->acquisitionStopped();
         }
     }
@@ -81,12 +82,14 @@ void DataThread::updateChannels()
 	ttlEventWords.clear();
 	timestamps.clear();
 	int nSub = getNumSubProcessors();
+
 	for (int i = 0; i < nSub; i++)
 	{
 		ttlEventWords.add(0);
 		timestamps.add(0);
 	}
-    if (usesCustomNames())
+
+    if (foundInputSource() && usesCustomNames())
     {
         channelInfo.resize (sn->getTotalDataChannels());
         setDefaultChannelNames();

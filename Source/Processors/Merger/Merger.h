@@ -63,8 +63,11 @@ public:
     void switchIO() override;
     int switchToSourceNode(GenericProcessor* sn);
     void setMergerSourceNode(GenericProcessor* sn) override;
+    GenericProcessor* getSourceNode(int);
 
     void updateSettings() override;
+    void restoreConnections();
+
     void addSettingsFromSourceNode(GenericProcessor* sn);
 
     bool stillHasSource() const override;
@@ -77,10 +80,14 @@ public:
 
     bool mergeEventsA, mergeContinuousA, mergeEventsB, mergeContinuousB;
 
-private:
-
     GenericProcessor* sourceNodeA;
     GenericProcessor* sourceNodeB;
+    
+    int getPath() {
+        return activePath;
+    }
+
+private:
 
     int activePath;
 

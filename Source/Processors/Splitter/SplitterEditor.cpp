@@ -100,23 +100,11 @@ void SplitterEditor::buttonEvent(Button* button)
 {
     if (button == pipelineSelectorA)
     {
-        pipelineSelectorA->setToggleState(true, dontSendNotification);
-        pipelineSelectorB->setToggleState(false, dontSendNotification);
-        Splitter* processor = (Splitter*) getProcessor();
-        processor->switchIO(0);
-
-		AccessClass::getEditorViewport()->makeEditorVisible(this, false);
-
+        AccessClass::getEditorViewport()->switchIO(getProcessor(), 0);
     }
     else if (button == pipelineSelectorB)
     {
-        pipelineSelectorB->setToggleState(true, dontSendNotification);
-        pipelineSelectorA->setToggleState(false, dontSendNotification);
-        Splitter* processor = (Splitter*) getProcessor();
-        processor->switchIO(1);
-
-		AccessClass::getEditorViewport()->makeEditorVisible(this, false);
-
+        AccessClass::getEditorViewport()->switchIO(getProcessor(), 1);
     }
 }
 
@@ -139,7 +127,7 @@ void SplitterEditor::switchDest(int dest)
 
     }
 
-	AccessClass::getEditorViewport()->makeEditorVisible(this, false);
+	
 }
 
 void SplitterEditor::switchIO(int dest)
@@ -155,12 +143,16 @@ int SplitterEditor::getPathForEditor(GenericEditor* editor)
 
     for (int pathNum = 0; pathNum < 2; pathNum++)
     {
-        processor->switchIO();
-
-        if (processor->getDestNode() != nullptr)
+        if (processor->getDestNode(pathNum) != nullptr)
         {
-            if (processor->getDestNode()->getEditor() == editor)
-                return processor->getPath();
+            LOGDD(" PATH ", pathNum, " editor: ", processor->getDestNode(pathNum)->getEditor()->getName());
+
+            if (processor->getDestNode(pathNum)->getEditor() == editor)
+            {
+                LOGDD(" MATCHING PATH: ", pathNum);
+                return pathNum;
+            }
+                
         }
     }
 
@@ -178,10 +170,8 @@ Array<GenericEditor*> SplitterEditor::getConnectedEditors()
 
     for (int pathNum = 0; pathNum < 2; pathNum++)
     {
-        processor->switchIO();
-
-        if (processor->getDestNode() != nullptr)
-            editors.add(processor->getDestNode()->getEditor());
+        if (processor->getDestNode(pathNum) != nullptr)
+            editors.add(processor->getDestNode(pathNum)->getEditor());
         else
             editors.add(nullptr);
     }
